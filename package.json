@@ -12,6 +12,7 @@
     "oauth"
   ],
   "dependencies": {
+    "forecast": "^0.2.1",
     "oauth": "0.9.9"
   },
   "devDependencies": {
