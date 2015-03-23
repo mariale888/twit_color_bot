@@ -9,6 +9,9 @@ var fs = require('fs'),
 var geocoder = require('geocoder');
 var restclient = require('node-restclient');
 
+var GoogleNews = require('google-news');
+var WordPOS = require('wordpos');
+var wordpos = new WordPOS();
 
 var Bot = module.exports = function(config) { 
   this.twit = new Twit(config);
@@ -39,8 +42,34 @@ this.getNounsURL = "http://api.wordnik.com/v4/words.json/randomWords?" +
                   "minCorpusCount=100&api_key=2ce45a1afe880c59f50000da91b03cc52677361bc627e6026";
 
 
+  this.googleNews = new GoogleNews();
+  
+ 
 };
 
+
+// 
+// get news from current city
+//
+Bot.prototype.stopNews = function () {
+  this.googleNews.stream.disconnect();
+}
+
+Bot.prototype.getNews = function (city, callback) {
+
+  this.googleNews.stream(city, function(stream) {
+      stream.on(GoogleNews.DATA, function(data) {
+         stream.disconnect();
+         return callback(data.title);
+        //return console.log('Data Event received... ' + data.title);
+      });
+  
+      stream.on(GoogleNews.ERROR, function(error) {
+        stream.disconnect();
+        return console.log('Error Event received... ' + error);
+      });
+    });
+}
 
 // 
 // get weather forcast for current coordinate
@@ -144,7 +173,17 @@ Bot.prototype.random_city = function (coordinates, city_name, callback) {
 //
 //  post a tweet
 //
-Bot.prototype.tweet = function (params, callback) {
+Bot.prototype.tweet = function (status, callback) {
+  if(typeof status !== 'string') {
+    return callback(new Error('tweet must be of type String'));
+  } else if(status.length > 140) {
+    return callback(new Error('tweet is too long: ' + status.length));
+  }
+  this.twit.post('statuses/update', { status: status }, callback);
+};
+
+
+Bot.prototype.tweet_with_art = function (params, callback) {
  
   /*(if(typeof status !== 'string') {
     return callback(new Error('tweet must be of type String'));
@@ -188,7 +227,7 @@ Bot.prototype.mingle = function (callback) {
 //
 Bot.prototype.makeSentence = function (city, callback) {
   var self = this;
-  statement = "";
+  var statement = "";
   var city_con = "color temperature of "+ city;
   
   restclient.get(this.getNounsURL,
@@ -227,35 +266,79 @@ Bot.prototype.makeSentence = function (city, callback) {
     statement += article + " " + data[0].word + " " + city_con + " " + connector + " " + article2 + " " + data[1].word;
     //console.log("Sen "+ statement);
     callback(statement);
-    /*restclient.get(
-      getAdjsURL,
-      function(data) {
-        var connector = " and";
-        switch (Math.floor(Math.random()*8)) {
-          case 0:
-            connector = ", not";
-          break;
-          case 1:
-            connector = ", yet";
-          break;
-          case 2:
-            connector = " but";
-          break;
-          case 3:
-            connector = ",";
-          break;
-          case 4:
-            connector = ", but not";
-          break;
-        }
-        output = data[0].word + connector + " " + data[1].word;
-        statement = statement + ": " + output;
-        console.log(statement);
-      
-      }    
-    ,"json"); */
+
   }    
   ,"json");
+  
+};
+//
+//  making sentence for current color tweer
+//
+Bot.prototype.makeSentence_1 = function (news, callback) {
+  var self = this;
+  var statement = "";
+  var adj = this.getAdjsURL;
+
+  restclient.get(this.getNounsURL,
+  function(data) {
+    var noun_1 = data[0].word;
+    var noun_2 = data[1].word;
+  
+    restclient.get(adj,
+      function(data) {
+         console.log('here1');
+        var adj_1 = data[0].word;
+        var adj_2 = data[1].word;
+
+
+        //combine 
+        wordpos.getAdjectives(news, function(result){
+         
+          wordpos.getNouns(news, function(result_1) {
+
+            var i =  Math.floor(Math.random() * result.length);
+            var i_ = Math.floor(Math.random() * result.length);
+            while(i != i_)
+              i_ = Math.floor(Math.random() * result.length);
+
+            var j =  Math.floor(Math.random() * result_1.length);
+            var j_ = Math.floor(Math.random() * result_1.length);
+              while(j != j_)
+              j_ = Math.floor(Math.random() * result_1.length);
+            
+            statement = news.replace(result[i],noun_1);
+            statement = news.replace(result[i_],noun_2);
+            statement = news.replace(result_1[j], adj_1);
+            statement = news.replace(result_1[j_], adj_2);
+
+            //console.log('stat  ' + news);
+            //console.log('statN  ' + statement);
+            callback(statement);
+
+          });
+        });
+      }
+     ,"json");
+  }    
+  ,"json");
+  
+};
+
+//
+//  getting trending hashtags
+//
+Bot.prototype.getHashtag = function (city, callback) {
+  var self = this;
+  
+  //console.log(this.rite.command("directory ['color']"));// directory('color weather',function(reply) {
+  
+     // console.log(arr);
+  // });
+ // restclient.get(this.getNounsURL,
+ // function(data) {
+  
+  //}    
+  //,"json");
   
 };
 
